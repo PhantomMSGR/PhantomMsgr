@@ -414,7 +414,7 @@ NestJS 10, TypeScript 5, Drizzle ORM, Socket.io, Bull (Redis queues), Zod, JWT
 </td></tr>
 <tr><td><b>Mobile</b></td><td>
 
-Expo 55, React Native 0.83 (New Architecture), Expo Router, NativeWind v4, Zustand, React Query, TweetNaCl, expo-audio
+Expo 55, React Native 0.83 (New Architecture), Expo Router, StyleSheet + theme tokens, Zustand, React Query, TweetNaCl, expo-audio
 
 </td></tr>
 <tr><td><b>Infrastructure</b></td><td>
