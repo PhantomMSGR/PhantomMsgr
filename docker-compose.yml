@@ -1,0 +1,346 @@
+name: phantom-msgr
+
+# ─── Reusable env fragments ───────────────────────────────────────────────────
+x-db-env: &db-env
+  DATABASE_URL: postgresql://phantom:${POSTGRES_PASSWORD:-phantom}@postgres:5432/phantom_msgr
+
+x-redis-env: &redis-env
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_URL: redis://redis:6379
+
+x-s3-env: &s3-env
+  S3_ENDPOINT: http://minio:9000
+  S3_REGION: us-east-1
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-phantom}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-phantom_secret}
+  S3_BUCKET: phantom-media
+  S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
+
+x-jwt-env: &jwt-env
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+
+# Shared defaults for every application service
+x-app-defaults: &app-defaults
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  networks:
+    - internal
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+# ─── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ─── Infrastructure ──────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: phantom_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: phantom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-phantom}
+      POSTGRES_DB: phantom_msgr
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phantom -d phantom_msgr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: phantom_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  minio:
+    image: minio/minio:latest
+    container_name: phantom_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-phantom}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-phantom_secret}
+    volumes:
+      - minio_data:/data
+    networks:
+      - internal
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Creates the S3 bucket and sets public-read policy on first start
+  minio-init:
+    image: minio/mc:latest
+    container_name: phantom_minio_init
+    networks:
+      - internal
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-phantom} $${MINIO_ROOT_PASSWORD:-phantom_secret} &&
+        mc mb --ignore-existing local/phantom-media &&
+        mc anonymous set download local/phantom-media &&
+        echo 'MinIO initialised'
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-phantom}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-phantom_secret}
+    restart: on-failure
+
+  # ─── Application micro-services ──────────────────────────────────────────
+
+  api-gateway:
+    <<: *app-defaults
+    container_name: phantom_api_gateway
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: api-gateway
+    environment:
+      <<: [*db-env, *redis-env, *s3-env, *jwt-env]
+      PORT: "3000"
+      NODE_ENV: production
+    ports:
+      - "${API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  auth-service:
+    <<: *app-defaults
+    container_name: phantom_auth_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: auth-service
+    environment:
+      <<: [*db-env, *redis-env, *jwt-env]
+      AUTH_HTTP_PORT: "3001"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  chat-service:
+    <<: *app-defaults
+    container_name: phantom_chat_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: chat-service
+    environment:
+      <<: [*db-env, *redis-env, *jwt-env]
+      CHAT_HTTP_PORT: "3002"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  messaging-service:
+    <<: *app-defaults
+    container_name: phantom_messaging_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: messaging-service
+    environment:
+      <<: [*db-env, *redis-env, *jwt-env]
+      MESSAGING_HTTP_PORT: "3003"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3003/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  media-service:
+    <<: *app-defaults
+    container_name: phantom_media_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: media-service
+    environment:
+      <<: [*db-env, *redis-env, *s3-env, *jwt-env]
+      MEDIA_HTTP_PORT: "3004"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  notification-service:
+    <<: *app-defaults
+    container_name: phantom_notification_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: notification-service
+    environment:
+      <<: [*redis-env]
+      FCM_SERVICE_ACCOUNT: ${FCM_SERVICE_ACCOUNT:-}
+      NODE_ENV: production
+    # notification-service is Redis-only consumer, no HTTP port needed
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  story-service:
+    <<: *app-defaults
+    container_name: phantom_story_service
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: story-service
+    environment:
+      <<: [*db-env, *redis-env, *jwt-env]
+      STORY_HTTP_PORT: "3005"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3005/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+# ─── Networks & Volumes ────────────────────────────────────────────────────────
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
