@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1774266534595,
+      "tag": "0000_cultured_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774388654926,
+      "tag": "0001_lumpy_hedge_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774552133631,
+      "tag": "0002_dark_karma",
+      "breakpoints": true
+    }
+  ]
+}
