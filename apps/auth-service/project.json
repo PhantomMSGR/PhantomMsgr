@@ -1,0 +1,31 @@
+{
+  "name": "auth-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "root": "apps/auth-service",
+  "sourceRoot": "apps/auth-service/src",
+  "tags": ["scope:backend", "type:app"],
+  "implicitDependencies": ["common", "contracts", "auth", "database", "redis"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/auth-service"],
+      "options": {
+        "command": "nest build auth-service"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start auth-service --watch"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/auth-service"],
+      "options": {
+        "command": "jest --testPathPattern=apps/auth-service --passWithNoTests --coverage=false"
+      }
+    }
+  }
+}
