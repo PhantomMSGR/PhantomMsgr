@@ -1,0 +1,12 @@
+{
+  "name": "sdk",
+  "$schema": "../../node_modules/nx/schemas/project.json",
+  "projectType": "library",
+  "sourceRoot": "libs/sdk/src",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc --noEmit", "cwd": "libs/sdk" }
+    }
+  }
+}

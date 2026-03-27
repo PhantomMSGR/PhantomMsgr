@@ -1,0 +1,28 @@
+{
+  "name": "web",
+  "$schema": "../../node_modules/nx/schemas/project.json",
+  "projectType": "application",
+  "sourceRoot": "apps/web/src",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run dev", "cwd": "apps/web" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run build", "cwd": "apps/web" }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run preview", "cwd": "apps/web" }
+    },
+    "tauri:dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run tauri", "cwd": "apps/web" }
+    },
+    "tauri:build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "npm run tauri:build", "cwd": "apps/web" }
+    }
+  }
+}
