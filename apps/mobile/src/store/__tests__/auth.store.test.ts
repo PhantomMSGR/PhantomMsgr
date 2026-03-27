@@ -1,47 +1,39 @@
 import { act } from '@testing-library/react-native'
-import * as SecureStore from 'expo-secure-store'
 import { useAuthStore } from '../auth.store'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
-jest.mock('@/api/auth', () => ({
-  authApi: {
+const mockSdk = {
+  onForceLogout: jest.fn(() => () => {}),
+  setAccessToken: jest.fn(),
+  getAccessToken: jest.fn(() => null),
+  auth: {
     register: jest.fn(),
     recover: jest.fn(),
     refresh: jest.fn(),
     logout: jest.fn(),
   },
-}))
-
-jest.mock('@/api/users', () => ({
-  usersApi: {
+  users: {
     getMe: jest.fn(),
+    deleteAccount: jest.fn(),
   },
+}
+
+const mockStorage = {
+  getRefreshToken: jest.fn(),
+  setRefreshToken: jest.fn(),
+  deleteRefreshToken: jest.fn(),
+  getAnonymousToken: jest.fn(),
+  setAnonymousToken: jest.fn(),
+  deleteAnonymousToken: jest.fn(),
+}
+
+jest.mock('@/lib/sdk', () => ({
+  sdk: mockSdk,
+  mobileTokenStorage: mockStorage,
 }))
 
-jest.mock('@/api/client', () => ({
-  setAccessToken: jest.fn(),
-  getAccessToken: jest.fn(() => null),
-  onForceLogout: jest.fn(() => () => {}),
-}))
-
-jest.mock('@/config', () => ({
-  SECURE_STORE_KEYS: {
-    ANONYMOUS_TOKEN: 'phantom_anonymous_token',
-    REFRESH_TOKEN: 'phantom_refresh_token',
-  },
-}))
-
-// ─── Typed helpers ────────────────────────────────────────────────────────────
-
-import { authApi } from '@/api/auth'
-import { usersApi } from '@/api/users'
-import { setAccessToken } from '@/api/client'
-
-const mockedAuthApi = authApi as jest.Mocked<typeof authApi>
-const mockedUsersApi = usersApi as jest.Mocked<typeof usersApi>
-const mockedSetAccessToken = setAccessToken as jest.Mock
-const mockedSecureStore = SecureStore as jest.Mocked<typeof SecureStore>
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const FAKE_USER = {
   id: 'user-1',
@@ -49,6 +41,8 @@ const FAKE_USER = {
   displayName: 'Alice',
   bio: null,
   avatarMediaId: null,
+  avatarEmoji: null,
+  avatarColor: null,
   isPremium: false,
   isVerified: false,
   isBot: false,
@@ -57,20 +51,18 @@ const FAKE_USER = {
   updatedAt: '2024-01-01T00:00:00Z',
 }
 
-const FAKE_SESSION = {
-  id: 'sess-1',
-  deviceName: 'iPhone',
-  platform: 'ios' as const,
-  appVersion: null,
-  ipAddress: null,
-  isActive: true,
-  lastActiveAt: '2024-01-01T00:00:00Z',
-  createdAt: '2024-01-01T00:00:00Z',
-}
-
 const FAKE_AUTH_RESPONSE = {
   user: { ...FAKE_USER, anonymousToken: 'abcdef01'.repeat(8) },
-  session: FAKE_SESSION,
+  session: {
+    id: 'sess-1',
+    deviceName: 'iPhone',
+    platform: 'ios' as const,
+    appVersion: null,
+    ipAddress: null,
+    isActive: true,
+    lastActiveAt: '2024-01-01T00:00:00Z',
+    createdAt: '2024-01-01T00:00:00Z',
+  },
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
   expiresIn: 900,
@@ -85,14 +77,16 @@ function resetStore() {
 beforeEach(() => {
   jest.clearAllMocks()
   resetStore()
-  ;(mockedSecureStore.getItemAsync as jest.Mock).mockResolvedValue(null)
-  ;(mockedSecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined)
-  ;(mockedSecureStore.deleteItemAsync as jest.Mock).mockResolvedValue(undefined)
+  mockStorage.getRefreshToken.mockResolvedValue(null)
+  mockStorage.setRefreshToken.mockResolvedValue(undefined)
+  mockStorage.deleteRefreshToken.mockResolvedValue(undefined)
+  mockStorage.setAnonymousToken.mockResolvedValue(undefined)
+  mockStorage.deleteAnonymousToken.mockResolvedValue(undefined)
 })
 
 describe('initialize', () => {
   it('sets isInitializing=false when no stored refresh token', async () => {
-    ;(mockedSecureStore.getItemAsync as jest.Mock).mockResolvedValue(null)
+    mockStorage.getRefreshToken.mockResolvedValue(null)
 
     await act(async () => {
       await useAuthStore.getState().initialize()
@@ -105,9 +99,9 @@ describe('initialize', () => {
   })
 
   it('restores session when refresh token is stored', async () => {
-    ;(mockedSecureStore.getItemAsync as jest.Mock).mockResolvedValue('stored-refresh')
-    mockedAuthApi.refresh.mockResolvedValue(FAKE_AUTH_RESPONSE)
-    mockedUsersApi.getMe.mockResolvedValue(FAKE_USER)
+    mockStorage.getRefreshToken.mockResolvedValue('stored-refresh')
+    mockSdk.auth.refresh.mockResolvedValue(FAKE_AUTH_RESPONSE)
+    mockSdk.users.getMe.mockResolvedValue(FAKE_USER)
 
     await act(async () => {
       await useAuthStore.getState().initialize()
@@ -117,12 +111,12 @@ describe('initialize', () => {
     expect(state.isAuthenticated).toBe(true)
     expect(state.user).toEqual(FAKE_USER)
     expect(state.isInitializing).toBe(false)
-    expect(mockedSetAccessToken).toHaveBeenCalledWith('access-token')
+    expect(mockSdk.setAccessToken).toHaveBeenCalledWith('access-token')
   })
 
   it('clears tokens and sets unauthenticated when refresh fails', async () => {
-    ;(mockedSecureStore.getItemAsync as jest.Mock).mockResolvedValue('bad-token')
-    mockedAuthApi.refresh.mockRejectedValue(new Error('Unauthorized'))
+    mockStorage.getRefreshToken.mockResolvedValue('bad-token')
+    mockSdk.auth.refresh.mockRejectedValue(new Error('Unauthorized'))
 
     await act(async () => {
       await useAuthStore.getState().initialize()
@@ -132,13 +126,13 @@ describe('initialize', () => {
     expect(state.isAuthenticated).toBe(false)
     expect(state.user).toBeNull()
     expect(state.isInitializing).toBe(false)
-    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalled()
+    expect(mockStorage.deleteRefreshToken).toHaveBeenCalled()
   })
 })
 
 describe('register', () => {
   it('registers, stores tokens, and returns anonymousToken', async () => {
-    mockedAuthApi.register.mockResolvedValue(FAKE_AUTH_RESPONSE)
+    mockSdk.auth.register.mockResolvedValue(FAKE_AUTH_RESPONSE)
 
     let result: { anonymousToken: string } | undefined
     await act(async () => {
@@ -149,14 +143,11 @@ describe('register', () => {
     const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(true)
     expect(state.user).toEqual(FAKE_AUTH_RESPONSE.user)
-    expect(mockedSecureStore.setItemAsync).toHaveBeenCalledWith(
-      'phantom_refresh_token',
-      'refresh-token',
-    )
+    expect(mockStorage.setRefreshToken).toHaveBeenCalledWith('refresh-token')
   })
 
   it('propagates API errors', async () => {
-    mockedAuthApi.register.mockRejectedValue(new Error('Server error'))
+    mockSdk.auth.register.mockRejectedValue(new Error('Server error'))
 
     await expect(
       act(async () => { await useAuthStore.getState().register('Alice') }),
@@ -166,7 +157,7 @@ describe('register', () => {
 
 describe('recover', () => {
   it('recovers account and authenticates', async () => {
-    mockedAuthApi.recover.mockResolvedValue(FAKE_AUTH_RESPONSE)
+    mockSdk.auth.recover.mockResolvedValue(FAKE_AUTH_RESPONSE)
     const token = 'abcdef01'.repeat(8)
 
     await act(async () => {
@@ -176,17 +167,14 @@ describe('recover', () => {
     const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(true)
     expect(state.user).toEqual(FAKE_AUTH_RESPONSE.user)
-    expect(mockedSecureStore.setItemAsync).toHaveBeenCalledWith(
-      'phantom_anonymous_token',
-      token,
-    )
+    expect(mockStorage.setAnonymousToken).toHaveBeenCalledWith(token)
   })
 })
 
 describe('logout', () => {
   it('clears state and tokens', async () => {
     useAuthStore.setState({ user: FAKE_USER, isAuthenticated: true })
-    mockedAuthApi.logout.mockResolvedValue(undefined)
+    mockSdk.auth.logout.mockResolvedValue(undefined)
 
     await act(async () => {
       await useAuthStore.getState().logout()
@@ -195,13 +183,13 @@ describe('logout', () => {
     const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(false)
     expect(state.user).toBeNull()
-    expect(mockedSetAccessToken).toHaveBeenCalledWith(null)
-    expect(mockedSecureStore.deleteItemAsync).toHaveBeenCalledWith('phantom_refresh_token')
+    expect(mockSdk.setAccessToken).toHaveBeenCalledWith(null)
+    expect(mockStorage.deleteRefreshToken).toHaveBeenCalled()
   })
 
   it('still clears state even if API call fails', async () => {
     useAuthStore.setState({ user: FAKE_USER, isAuthenticated: true })
-    mockedAuthApi.logout.mockRejectedValue(new Error('Network'))
+    mockSdk.auth.logout.mockRejectedValue(new Error('Network'))
 
     await act(async () => {
       await useAuthStore.getState().logout()

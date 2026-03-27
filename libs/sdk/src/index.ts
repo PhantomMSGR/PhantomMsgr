@@ -7,6 +7,7 @@ export { createMessagesApi } from './api/messages'
 export { createUsersApi } from './api/users'
 export { createMediaApi } from './api/media'
 export { createStoriesApi } from './api/stories'
+export { createKeysApi } from './api/keys'
 
 export type { RegisterDto, RecoverDto } from './api/auth'
 export type { CreateChatDto, UpdateChatDto, UpdateMemberSettingsDto } from './api/chats'
@@ -25,6 +26,7 @@ import { createMessagesApi } from './api/messages'
 import { createUsersApi } from './api/users'
 import { createMediaApi } from './api/media'
 import { createStoriesApi } from './api/stories'
+import { createKeysApi } from './api/keys'
 
 export function createPhantomSdk(options: ApiClientOptions) {
   const client = createApiClient(options)
@@ -37,6 +39,7 @@ export function createPhantomSdk(options: ApiClientOptions) {
     users: createUsersApi(client.instance),
     media: createMediaApi(client.instance),
     stories: createStoriesApi(client.instance),
+    keys: createKeysApi(client.instance),
   }
 }
 

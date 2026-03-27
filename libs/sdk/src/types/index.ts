@@ -150,6 +150,8 @@ export interface Chat {
   muteUntil?: string | null
   isPinned?: boolean
   unreadCount?: number
+  // Client-only — not persisted to DB
+  savedType?: 'local' | 'remote'
 }
 
 export interface ChatMember {
@@ -279,6 +281,18 @@ export interface PaginatedResponse<T> {
   nextCursor: string | null
   hasMore: boolean
 }
+
+// ─── Message List Item (grouped list with date separators) ────────────────────
+
+export type MessageListItem =
+  | {
+      type: 'message'
+      message: Message
+      isFirst: boolean
+      isLast: boolean
+      showAvatar: boolean
+    }
+  | { type: 'date'; date: string }
 
 // ─── Socket Events ────────────────────────────────────────────────────────────
 

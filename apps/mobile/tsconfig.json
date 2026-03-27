@@ -5,7 +5,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@phantom/ui": ["../../libs/mobile-ui/src/index.ts"]
+      "@phantom/ui": ["../../libs/mobile-ui/src/index.ts"],
+      "@phantom/sdk": ["../../libs/sdk/src/index.ts"]
     },
     "plugins": [{ "name": "typescript-plugin-css-modules" }]
   },

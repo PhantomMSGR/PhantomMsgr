@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useCallback } from 'react'
-import { messagesApi } from '@/api/messages'
+import { sdk } from '@/lib/sdk'
 import { QUERY_KEYS } from '@/config'
 import { useSocketStore } from '@/store/socket.store'
 import type {
@@ -19,7 +19,7 @@ export function useInfiniteMessages(chatId: string) {
   const query = useInfiniteQuery({
     queryKey: QUERY_KEYS.MESSAGES(chatId),
     queryFn: ({ pageParam }) =>
-      messagesApi.list(chatId, pageParam as string | undefined),
+      sdk.messages.list(chatId, pageParam as string | undefined),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? (lastPage.nextCursor ?? undefined) : undefined,

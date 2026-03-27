@@ -1,11 +1,7 @@
 import { create } from 'zustand'
-import * as SecureStore from 'expo-secure-store'
 import { Platform as RNPlatform } from 'react-native'
-import { authApi } from '@/api/auth'
-import { usersApi } from '@/api/users'
-import { setAccessToken, onForceLogout } from '@/api/client'
-import { SECURE_STORE_KEYS } from '@/config'
-import type { User, AuthResponse, Platform } from '@/types'
+import { sdk, mobileTokenStorage } from '@/lib/sdk'
+import type { User, Platform } from '@/types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -35,16 +31,11 @@ function getPlatform(): Platform {
   }
 }
 
-async function applyAuthResponse(data: AuthResponse): Promise<void> {
-  setAccessToken(data.accessToken)
-  await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, data.refreshToken)
-}
-
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useAuthStore = create<AuthState>((set, get) => {
   // Subscribe to forced logouts (e.g., refresh token expired)
-  onForceLogout(() => {
+  sdk.onForceLogout(() => {
     set({ user: null, isAuthenticated: false })
   })
 
@@ -58,25 +49,23 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     initialize: async () => {
       try {
-        const storedRefreshToken = await SecureStore.getItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN)
+        const storedRefreshToken = await mobileTokenStorage.getRefreshToken()
 
         if (!storedRefreshToken) {
           set({ isInitializing: false })
           return
         }
 
-        const data = await authApi.refresh(storedRefreshToken)
-        await applyAuthResponse(data)
+        const data = await sdk.auth.refresh(storedRefreshToken)
+        sdk.setAccessToken(data.accessToken)
+        await mobileTokenStorage.setRefreshToken(data.refreshToken)
 
-        // Store the new refresh token (rotation)
-        await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, data.refreshToken)
-
-        const user = await usersApi.getMe()
+        const user = await sdk.users.getMe()
         set({ user, isAuthenticated: true, isInitializing: false })
       } catch {
         // Refresh failed — user must log in again
-        setAccessToken(null)
-        await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN)
+        sdk.setAccessToken(null)
+        await mobileTokenStorage.deleteRefreshToken()
         set({ isInitializing: false, isAuthenticated: false, user: null })
       }
     },
@@ -84,20 +73,18 @@ export const useAuthStore = create<AuthState>((set, get) => {
     // ── register ─────────────────────────────────────────────────────────────
 
     register: async (displayName: string, deviceName?: string) => {
-      const data = await authApi.register({
+      const data = await sdk.auth.register({
         displayName,
         platform: getPlatform(),
         deviceName,
       })
 
-      await applyAuthResponse(data)
+      sdk.setAccessToken(data.accessToken)
+      await mobileTokenStorage.setRefreshToken(data.refreshToken)
 
       // Persist the anonymous token — the user must store this themselves too
       if (data.user.anonymousToken) {
-        await SecureStore.setItemAsync(
-          SECURE_STORE_KEYS.ANONYMOUS_TOKEN,
-          data.user.anonymousToken,
-        )
+        await mobileTokenStorage.setAnonymousToken(data.user.anonymousToken)
       }
 
       set({ user: data.user, isAuthenticated: true })
@@ -107,14 +94,15 @@ export const useAuthStore = create<AuthState>((set, get) => {
     // ── recover ──────────────────────────────────────────────────────────────
 
     recover: async (anonymousToken: string, deviceName?: string) => {
-      const data = await authApi.recover({
+      const data = await sdk.auth.recover({
         anonymousToken,
         platform: getPlatform(),
         deviceName,
       })
 
-      await applyAuthResponse(data)
-      await SecureStore.setItemAsync(SECURE_STORE_KEYS.ANONYMOUS_TOKEN, anonymousToken)
+      sdk.setAccessToken(data.accessToken)
+      await mobileTokenStorage.setRefreshToken(data.refreshToken)
+      await mobileTokenStorage.setAnonymousToken(anonymousToken)
 
       set({ user: data.user, isAuthenticated: true })
     },
@@ -123,13 +111,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     logout: async () => {
       try {
-        await authApi.logout()
+        await sdk.auth.logout()
       } catch {
         // Best-effort; clear state regardless
       }
 
-      setAccessToken(null)
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN)
+      sdk.setAccessToken(null)
+      await mobileTokenStorage.deleteRefreshToken()
       // Note: we intentionally keep ANONYMOUS_TOKEN so the user can recover later
 
       set({ user: null, isAuthenticated: false })
@@ -139,21 +127,21 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     deleteAccount: async () => {
       try {
-        await usersApi.deleteAccount()
-        await authApi.logout()
+        await sdk.users.deleteAccount()
+        await sdk.auth.logout()
       } catch {
         // best-effort; clear local state regardless
       }
-      setAccessToken(null)
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN)
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.ANONYMOUS_TOKEN)
+      sdk.setAccessToken(null)
+      await mobileTokenStorage.deleteRefreshToken()
+      await mobileTokenStorage.deleteAnonymousToken()
       set({ user: null, isAuthenticated: false })
     },
 
     // ── refreshUser ──────────────────────────────────────────────────────────
 
     refreshUser: async () => {
-      const user = await usersApi.getMe()
+      const user = await sdk.users.getMe()
       set({ user })
     },
 

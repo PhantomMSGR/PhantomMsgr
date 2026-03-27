@@ -18,7 +18,7 @@ import {
   decryptMessage,
   type KeyPair,
 } from '@/lib/crypto'
-import { keysApi } from '@/api/keys'
+import { sdk } from '@/lib/sdk'
 
 const SK_PUB = 'phantom_e2e_pk'
 const SK_SEC = 'phantom_e2e_sk'
@@ -59,7 +59,7 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
 
       // Publish our public key to the server (idempotent)
       const { publicKey } = keyPairToStrings(kp)
-      await keysApi.publishPublicKey(publicKey).catch(() => {
+      await sdk.keys.publishPublicKey(publicKey).catch(() => {
         // Non-fatal — we can still send/receive if we have a cached key
         console.warn('[crypto] Failed to publish public key')
       })
@@ -78,7 +78,7 @@ export const useCryptoStore = create<CryptoState>((set, get) => ({
     if (cached) return cached
 
     try {
-      const b64 = await keysApi.getPublicKey(userId)
+      const b64 = await sdk.keys.getPublicKey(userId)
       const pubKey = publicKeyFromString(b64)
       set((s) => ({ knownPublicKeys: { ...s.knownPublicKeys, [userId]: pubKey } }))
       return pubKey
