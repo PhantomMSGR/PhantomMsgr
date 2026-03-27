@@ -1,0 +1,31 @@
+{
+  "name": "chat-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "root": "apps/chat-service",
+  "sourceRoot": "apps/chat-service/src",
+  "tags": ["scope:backend", "type:app"],
+  "implicitDependencies": ["common", "contracts", "auth", "database", "redis"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/chat-service"],
+      "options": {
+        "command": "nest build chat-service"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start chat-service --watch"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/chat-service"],
+      "options": {
+        "command": "jest --testPathPattern=apps/chat-service --passWithNoTests --coverage=false"
+      }
+    }
+  }
+}
