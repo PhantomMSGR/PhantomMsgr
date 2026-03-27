@@ -1,0 +1,38 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`DateSeparator matches snapshot 1`] = `
+<View
+  style={
+    {
+      "alignItems": "center",
+      "flexDirection": "row",
+      "justifyContent": "center",
+      "marginVertical": 12,
+      "paddingHorizontal": 24,
+    }
+  }
+>
+  <View
+    style={
+      {
+        "backgroundColor": "rgba(36,36,36,0.8)",
+        "borderRadius": 9999,
+        "paddingHorizontal": 12,
+        "paddingVertical": 4,
+      }
+    }
+  >
+    <Text
+      style={
+        {
+          "color": "#6b6b6b",
+          "fontSize": 11,
+          "fontWeight": "500",
+        }
+      }
+    >
+      Today
+    </Text>
+  </View>
+</View>
+`;
