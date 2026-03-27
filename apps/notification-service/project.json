@@ -1,0 +1,31 @@
+{
+  "name": "notification-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "root": "apps/notification-service",
+  "sourceRoot": "apps/notification-service/src",
+  "tags": ["scope:backend", "type:app"],
+  "implicitDependencies": ["common", "contracts", "redis"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/notification-service"],
+      "options": {
+        "command": "nest build notification-service"
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start notification-service --watch"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/coverage/apps/notification-service"],
+      "options": {
+        "command": "jest --testPathPattern=apps/notification-service --passWithNoTests --coverage=false"
+      }
+    }
+  }
+}
