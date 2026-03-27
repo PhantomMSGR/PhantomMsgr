@@ -167,7 +167,7 @@ PhantomMsgr is an **Nx monorepo** containing seven NestJS microservices and an E
 ### 1 — Clone & install
 
 ```bash
-git clone https://github.com/your-username/PhantomMsgr.git
+git clone git https://github.com/PhantomMSGR/PhantomMsgr.git
 cd PhantomMsgr
 npm install
 ```
