@@ -1,12 +1,28 @@
 {
   "compilerOptions": {
-    "target": "es2016",
     "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
+    "target": "ES2021",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
     "skipLibCheck": true,
-    "outDir": "dist"
-  },
-  "include": ["src"]
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strict": false,
+    "forceConsistentCasingInFileNames": false,
+    "paths": {
+      "@phantom/database":  ["libs/database/src"],
+      "@phantom/common":    ["libs/common/src"],
+      "@phantom/contracts": ["libs/contracts/src"],
+      "@phantom/auth":      ["libs/auth/src"],
+      "@phantom/redis":     ["libs/redis/src"]
+    }
+  }
 }

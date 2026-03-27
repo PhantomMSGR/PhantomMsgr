@@ -2,6 +2,7 @@
 /out-tsc
 
 /node_modules
+apps/mobile/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -9,3 +10,21 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+.nx/
+!.nx/workflows
+.idea/
+.claude/worktrees
+.claude/settings.local.json
+
+# Build output
+dist/
+
+# Environment files
+.env
+apps/mobile/.env
+
+# Expo
+apps/mobile/.expo/
+
+# Android build
+apps/mobile/android/
