@@ -1,0 +1,16 @@
+{
+  "extends": "../../apps/mobile/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "rootDir": "src",
+    "paths": {
+      "@/*": ["../../apps/mobile/src/*"],
+      "react": ["../../apps/mobile/node_modules/@types/react"],
+      "react/jsx-runtime": ["../../apps/mobile/node_modules/@types/react/jsx-runtime"],
+      "@expo/vector-icons": ["../../apps/mobile/node_modules/expo/node_modules/@expo/vector-icons"],
+      "@expo/vector-icons/*": ["../../apps/mobile/node_modules/expo/node_modules/@expo/vector-icons/*"],
+      "*": ["../../apps/mobile/node_modules/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

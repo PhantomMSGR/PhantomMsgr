@@ -1,0 +1,8 @@
+{
+  "name": "common",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "root": "libs/common",
+  "sourceRoot": "libs/common/src",
+  "tags": ["scope:backend", "type:lib"]
+}
